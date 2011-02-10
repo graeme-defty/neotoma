@@ -68,7 +68,7 @@ generate_entry_functions(Root) ->
      "parse(List) when is_list(List) -> parse(list_to_binary(List));\n",
      "parse(Input) when is_binary(Input) ->\n",
      "  setup_memo(),\n",
-     "  Result = case '",RootRule,"'(Input,{{line,1},{column,1}}) of\n",
+     "  Result = case '",RootRule,"'(Input,[1|1]) of\n",
      "             {AST, <<>>, _Index} -> AST;\n",
      "             Any -> Any\n"
      "           end,\n",

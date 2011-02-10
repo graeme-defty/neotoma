@@ -180,17 +180,16 @@ p_charclass(Class) ->
             end
     end.
 
-line({{line,L},_}) -> L;
+line([Line|_]) -> Line;
 line(_) -> undefined.
 
-column({_,{column,C}}) -> C;
+column([_|Col]) -> Col;
 column(_) -> undefined.
 
 p_advance_index(MatchedInput, Index) when is_list(MatchedInput) orelse is_binary(MatchedInput)-> % strings
   lists:foldl(fun p_advance_index/2, Index, unicode:characters_to_list(MatchedInput));
-p_advance_index(MatchedInput, Index) when is_integer(MatchedInput) -> % single characters
-  {{line, Line}, {column, Col}} = Index,
+p_advance_index(MatchedInput, [Line|Col]) when is_integer(MatchedInput) -> % single characters
   case MatchedInput of
-    $\n -> {{line, Line+1}, {column, 1}};
-    _ -> {{line, Line}, {column, Col+1}}
+    $\n -> [Line+1|1];
+    _   -> [Line|Col+1]
   end.

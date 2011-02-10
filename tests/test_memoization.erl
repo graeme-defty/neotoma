@@ -14,9 +14,9 @@ release_memo_test() ->
 
 step_memo_test() ->
     peg_includes:setup_memo(),
-    Result = peg_includes:p(<<"abcdefghi">>, {{line,1},{column,1}}, anything, peg_includes:p_anything()),
-    ?assertEqual({<<"a">>, <<"bcdefghi">>, {{line,1},{column,2}}}, Result),
-    Result2 = peg_includes:p(<<"abcdefghi">>, {{line,1},{column,1}}, anything, fun(_) ->
+    Result = peg_includes:p(<<"abcdefghi">>, [1|1], anything, peg_includes:p_anything()),
+    ?assertEqual({<<"a">>, <<"bcdefghi">>, [1|2]}, Result),
+    Result2 = peg_includes:p(<<"abcdefghi">>, [1|1], anything, fun(_) ->
                                                                                   throw(bork) end),
     ?assertEqual(Result, Result2),
     peg_includes:release_memo().

@@ -79,7 +79,7 @@ file(Filename) -> {ok, Bin} = file:read_file(Filename), parse(Bin).
 parse(List) when is_list(List) -> parse(list_to_binary(List));
 parse(Input) when is_binary(Input) ->
   setup_memo(),
-  Result = case 'rules'(Input,{{line,1},{column,1}}) of
+  Result = case 'rules'(Input,[1|1]) of
              {AST, <<>>, _Index} -> AST;
              Any -> Any
            end,
@@ -271,44 +271,54 @@ p(Inp, Index, Name, ParseFun) ->
   p(Inp, Index, Name, ParseFun, fun(N, _Idx) -> N end).
 
 p(Inp, StartIndex, Name, ParseFun, TransformFun) ->
-  % Grab the memo table from ets
-  Memo = get_memo(StartIndex),
-  % See if the current reduction is memoized
-  case proplists:lookup(Name, Memo) of
-    % If it is, return the result
-    {Name, Result} -> Result;
-    % If not, attempt to parse
-    _ ->
+  case get_memo(StartIndex, Name) of      % See if the current reduction is memoized
+    {ok, Memo} -> %Memo;                     % If it is, return the stored result
+      Memo;
+    _ ->                                        % If not, attempt to parse
       case ParseFun(Inp, StartIndex) of
-        % If it fails, memoize the failure
-        {fail,_} = Failure ->
-          memoize(StartIndex, [{Name, Failure}|Memo]),
-          Failure;
-        % If it passes, transform and memoize the result.
-        {Result, InpRem, NewIndex} ->
-          Transformed = TransformFun(Result, StartIndex),
-          memoize(StartIndex, [{Name, {Transformed, InpRem, NewIndex}}|Memo]),
-          {Transformed, InpRem, NewIndex}
-      end
+        {fail,_} = Failure ->                       % If it fails, memoize the failure
+          Result = Failure;
+        {Match, InpRem, NewIndex} ->               % If it passes, transform and memoize the result.
+          Transformed = TransformFun(Match, StartIndex),
+          Result = {Transformed, InpRem, NewIndex}
+      end,
+      memoize(StartIndex, Name, Result),
+      Result
   end.
 
 setup_memo() ->
-  put(parse_memo_table, ets:new(?MODULE, [set])).
+  put(parse_memo_table_data,[]),
+  Name = ets:new(?MODULE, [set]),
+  put(parse_memo_table, Name),
+  Name.
 
 release_memo() ->
-  ets:delete(memo_table_name()).
+  ets:delete(memo_table_name()),
+  erase(parse_memo_table),
+  erase(parse_memo_table_data).
 
-memoize(Position, Struct) ->
-  ets:insert(memo_table_name(), {Position, Struct}).
+memoize(Index, Name, Result) ->
+  Memo_data = get(memo_table_name(data)),
+  case proplists:lookup(Index, Memo_data) of
+       none -> Plist = [];
+       {Index, Plist} -> Plist
+  end,
+  put(memo_table_name(data), [{Index, [{Name, Result} | Plist]} | Memo_data]).
 
-get_memo(Position) ->
-  case ets:lookup(memo_table_name(), Position) of
-    [] -> [];
-    [{Position, PList}] -> PList
-  end.
+get_memo(Index, Name) ->
+  case proplists:lookup(Index, get(memo_table_name(data))) of
+    none -> {error, not_found};
+    {Index, Plist} ->
+      case proplists:lookup(Name, Plist) of
+        {Name, Result}  -> {ok, Result};
+        _  -> {error, not_found}
+      end
+    end.
 
 memo_table_name() ->
     get(parse_memo_table).
+memo_table_name(data) ->
+    parse_memo_table_data.
 
 p_eof() ->
   fun(<<>>, Index) -> {eof, [], Index};
@@ -434,17 +444,16 @@ p_charclass(Class) ->
             end
     end.
 
-line({{line,L},_}) -> L;
+line([Line|_]) -> Line;
 line(_) -> undefined.
 
-column({_,{column,C}}) -> C;
+column([_|Col]) -> Col;
 column(_) -> undefined.
 
 p_advance_index(MatchedInput, Index) when is_list(MatchedInput) orelse is_binary(MatchedInput)-> % strings
   lists:foldl(fun p_advance_index/2, Index, unicode:characters_to_list(MatchedInput));
-p_advance_index(MatchedInput, Index) when is_integer(MatchedInput) -> % single characters
-  {{line, Line}, {column, Col}} = Index,
+p_advance_index(MatchedInput, [Line|Col]) when is_integer(MatchedInput) -> % single characters
   case MatchedInput of
-    $\n -> {{line, Line+1}, {column, 1}};
-    _ -> {{line, Line}, {column, Col+1}}
+    $\n -> [Line+1|1];
+    _   -> [Line|Col+1]
   end.

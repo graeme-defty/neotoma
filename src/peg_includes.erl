@@ -7,7 +7,7 @@
 % Erlang-y.
 
 %% @type parse_fun() = function(Input::string(), Index::parse_index()) .
-%% @type parse_index() = {{line, integer()},{column,integer()}} .
+%% @type parse_index() = [integer()|integer()] .
 %% @type parse_result() = ({fail, Reason} | {Result::any(), Remainder::string(), NewIndex::parse_index()}) .
 
 -export([p/4, p/5]).
@@ -229,21 +229,20 @@ p_charclass(Class) ->
             end
     end.
 
-%% @doc Extracts the line number from the Idx tuple
+%% @doc Extracts the line number from an Idx structure
 %% @spec line(parse_index()) -> integer()
-line({{line,L},_}) -> L;
+line([Line|_]) -> Line;
 line(_) -> undefined.
 
 %% @doc Extracts the column number from the Idx tuple
 %% @spec column(parse_index()) -> integer()
-column({_,{column,C}}) -> C;
+column([_|Col]) -> Col;
 column(_) -> undefined.
 
 p_advance_index(MatchedInput, Index) when is_list(MatchedInput) orelse is_binary(MatchedInput)-> % strings
   lists:foldl(fun p_advance_index/2, Index, unicode:characters_to_list(MatchedInput));
-p_advance_index(MatchedInput, Index) when is_integer(MatchedInput) -> % single characters
-  {{line, Line}, {column, Col}} = Index,
+p_advance_index(MatchedInput, [Line|Col]) when is_integer(MatchedInput) -> % single characters
   case MatchedInput of
-    $\n -> {{line, Line+1}, {column, 1}};
-    _ -> {{line, Line}, {column, Col+1}}
+    $\n -> [Line+1|1];
+    _   -> [Line|Col+1]
   end.
