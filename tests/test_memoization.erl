@@ -4,13 +4,13 @@
 
 setup_memo_test() ->
     peg_includes:setup_memo(),
-    ?assertNot(undefined == ets:info(get(parse_memo_table))),
-    peg_includes:release_memo().
+    ?assertNot(undefined == get(parse_memo_table)),
+     peg_includes:release_memo().
 
 release_memo_test() ->
     peg_includes:setup_memo(),
     peg_includes:release_memo(),
-    ?assertEqual(undefined, ets:info(get(parse_memo_table))).
+    ?assertEqual(undefined, get(parse_memo_table)).
 
 step_memo_test() ->
     peg_includes:setup_memo(),

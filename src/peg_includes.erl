@@ -41,23 +41,29 @@ p(Inp, StartIndex, Name, ParseFun, TransformFun) ->
 %% @doc Sets up the packrat memoization table for this parse. Used internally by generated parsers.
 %% @spec setup_memo() -> any()
 setup_memo() ->
-  put(parse_memo_table, ets:new(?MODULE, [set])).
+  put(parse_memo_table_data,[]),
+  Name = ets:new(?MODULE, [set]),
+  put(parse_memo_table, Name),
+  Name.
 
 %% @doc Cleans up the packrat memoization table.  Used internally by generated parsers.
 release_memo() ->
-  ets:delete(memo_table_name()).
+  ets:delete(memo_table_name()),
+  erase(parse_memo_table),
+  erase(parse_memo_table_data).
 
 memoize(Index, Name, Result) ->
-  Memo = case ets:lookup(memo_table_name(), Index) of
-              [] -> [];
-              [{Index, Plist}] -> Plist
-         end,
-  ets:insert(memo_table_name(), {Index, [{Name, Result}|Memo]}).
+  Memo_data = get(memo_table_name(data)),
+  case proplists:lookup(Index, Memo_data) of
+       none -> Plist = [];
+       {Index, Plist} -> Plist
+  end,
+  put(memo_table_name(data), [{Index, [{Name, Result} | Plist]} | Memo_data]).
 
 get_memo(Index, Name) ->
-  case ets:lookup(memo_table_name(), Index) of
-    [] -> {error, not_found};
-    [{Index, Plist}] ->
+  case proplists:lookup(Index, get(memo_table_name(data))) of
+    none -> {error, not_found};
+    {Index, Plist} ->
       case proplists:lookup(Name, Plist) of
         {Name, Result}  -> {ok, Result};
         _  -> {error, not_found}
@@ -66,6 +72,8 @@ get_memo(Index, Name) ->
 
 memo_table_name() ->
     get(parse_memo_table).
+memo_table_name(data) ->
+    parse_memo_table_data.
 
 %% @doc Generates a parse function that matches the end of the buffer.
 %% @spec p_eof() -> parse_fun()
